@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#102a43">
+<title>Amparo — Acompanhamento</title>
+<style>
+:root{--navy:#102a43;--blue:#1d4e89;--red:#d62828;--green:#16845b;--bg:#f3f6fa;--muted:#62748a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#172b4d;font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:13px;padding:14px 16px;font-weight:750}.hidden{display:none!important}.wrap{max-width:520px;margin:auto;padding:20px 16px 40px}.brand{color:var(--navy);font-size:25px;font-weight:850;letter-spacing:-.7px}.sub{color:var(--muted);margin-top:3px}.panel{background:#fff;border:1px solid #e3eaf2;border-radius:20px;padding:20px;margin-top:18px;box-shadow:0 8px 28px #102a430a}.field{display:block;margin:15px 0 6px;font-size:14px;font-weight:750}.input{width:100%;padding:14px;border:1px solid #ccd7e3;border-radius:12px;background:white;outline-color:var(--blue)}.primary{background:var(--blue);color:white;width:100%;margin-top:16px}.secondary{background:#e9f0f8;color:var(--navy)}.danger{background:var(--red);color:white}.notice{font-size:13px;color:var(--muted);line-height:1.5}.row{display:flex;gap:10px}.row>*{flex:1}.code{font-weight:900;letter-spacing:3px;font-size:23px}.status{padding:11px 13px;border-radius:12px;background:#edf3f8;color:#42556b;font-size:14px;margin-top:12px}.status.ok{background:#e5f7ef;color:#116b49}.status.err{background:#fff0ef;color:#a52020}.sos-screen{min-height:calc(100dvh - 40px);display:flex;flex-direction:column;align-items:center;text-align:center}.sos-button{width:min(72vw,300px);height:min(72vw,300px);max-height:300px;border-radius:50%;background:linear-gradient(145deg,#f04444,#c51625);color:white;border:10px solid #ffdada;box-shadow:0 14px 0 #9e1722,0 24px 40px #b31b2b35;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:35px auto 28px;font-size:27px}.sos-button span{font-size:62px;line-height:1.2}.sos-button:active{transform:translateY(4px);box-shadow:0 8px 0 #9e1722}.small{font-size:12px;color:var(--muted)}.alert-card{padding:15px;border:1px solid #f1caca;border-radius:14px;background:#fff7f7;margin-top:12px}.alert-card h3{margin:0 0 5px;color:#a51f29}.footer{text-align:center;color:#738196;font-size:12px;margin-top:25px}
+</style>
+</head>
+<body><main class="wrap">
+<header><div class="brand">♥ Amparo</div><div class="sub">Acompanhamento e pedido de ajuda</div></header>
+<section id="setup" class="panel"><h2 style="margin-top:0">Começar</h2><p class="notice">Escolha seu perfil e preencha os dados. Para conectar celulares distantes, o sistema usa MQTT sobre WebSocket. Use apenas para demonstração até configurar um broker privado e seguro.</p>
+<label class="field" for="role">Meu perfil</label><select id="role" class="input"><option value="idoso">Sou o idoso</option><option value="cuidador">Sou cuidador</option></select>
+<label class="field" for="name">Seu nome</label><input id="name" class="input" maxlength="60" placeholder="Digite seu nome" autocomplete="name">
+<label class="field" for="pair">Código de vínculo</label><input id="pair" class="input" maxlength="8" placeholder="Ex.: CASA482" autocapitalize="characters" autocomplete="off">
+<p class="notice">O idoso e o cuidador devem usar o mesmo código. Combine-o em particular com a pessoa de confiança.</p>
+<button id="start" class="primary">Entrar no sistema</button><div id="setupMsg" class="status">Aguardando configuração.</div>
+</section>
+<section id="elder" class="hidden"><div class="sos-screen"><div style="margin-top:25px"><div class="small">PERFIL DO IDOSO</div><h2 id="elderHello" style="margin:4px 0">Olá!</h2><div class="notice">Se precisar de ajuda, toque no botão abaixo.</div></div><button id="sos" class="sos-button"><span>!</span>PRECISO<br>DE AJUDA</button><div id="elderStatus" class="status" style="width:100%">Conecte-se à internet para enviar alertas.</div><button id="wake" class="secondary" style="margin-top:12px;width:100%">Manter tela ligada</button><p class="notice">Use este botão para avisar seu cuidador. Se for uma emergência imediata, procure também os serviços de emergência locais.</p><button class="secondary" id="changeProfile" style="width:100%;margin-top:12px">Sair / trocar perfil</button></div></section>
+<section id="care" class="hidden"><div class="panel"><div class="small">PERFIL DO CUIDADOR</div><h2 id="careHello" style="margin:5px 0">Painel do cuidador</h2><p class="notice">Esta tela precisa permanecer aberta e conectada para acompanhar os alertas em tempo real.</p><div id="careStatus" class="status">Conectando...</div><div class="row" style="margin-top:14px"><button id="notify" class="secondary">Ativar notificações</button><button id="vibrate" class="secondary">Testar vibração</button></div></div><div class="panel"><h3 style="margin-top:0">Alertas recebidos</h3><div id="alerts"><p class="notice">Nenhum alerta recebido nesta sessão.</p></div><button id="clear" class="secondary" style="width:100%;margin-top:12px">Limpar lista desta tela</button><button id="changeProfile2" class="secondary" style="width:100%;margin-top:10px">Sair / trocar perfil</button></div></section>
+<div class="footer">Protótipo demonstrativo • Não substitui um serviço profissional de emergência.</div>
+</main>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+/* AMPARO — MQTT.js sobre WebSocket seguro (WSS)
+   Demonstração: broker público EMQX. Tópicos em broker público NÃO são privados.
+   Para uso real, configure broker próprio com autenticação, ACL por sala e TLS.
+   O painel do cuidador precisa ficar aberto para receber alertas nesta versão.
+*/
+const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const $ = id => document.getElementById(id);
+let client=null, profile=null, wakeLock=null, connected=false;
+const seen=new Set();
+let roomBase='';
+function status(id,msg,type=''){const el=$(id);el.textContent=msg;el.className='status '+type}
+function show(id){['setup','elder','care'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
+function cleanCode(s){return s.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)}
+function stop(){if(client){client.end(true);client=null}connected=false;show('setup');$('setupMsg').textContent='Você saiu do sistema.';if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null}}
+function topic(suffix){return roomBase+'/'+suffix}
+function connectMQTT(role,name,code){
+  roomBase='amparo/demo/'+code;
+  status(role==='idoso'?'elderStatus':'careStatus','Conectando ao serviço MQTT...');
+  const clientId='amparo_'+role+'_'+Math.random().toString(16).slice(2,12);
+  client=mqtt.connect(MQTT_BROKER,{clientId,clean:true,connectTimeout:10000,reconnectPeriod:3000,keepalive:30});
+  client.on('connect',()=>{
+    connected=true;
+    if(role==='idoso'){
+      status('elderStatus','Conectado. O botão de ajuda está pronto.','ok');
+      client.publish(topic('profile'),JSON.stringify({name,role:'idoso',updatedAt:Date.now()}),{retain:true,qos:0});
+    }else{
+      status('careStatus','Conectado ao MQTT. Aguardando alertas.','ok');
+      client.subscribe([topic('profile'),topic('alerts/+'),topic('acks/+')],{qos:0},err=>{if(err)status('careStatus','Falha ao assinar tópicos MQTT.','err')});
+    }
+  });
+  client.on('reconnect',()=>{connected=false;status(role==='idoso'?'elderStatus':'careStatus','Reconectando à internet...')});
+  client.on('offline',()=>{connected=false;status(role==='idoso'?'elderStatus':'careStatus','Sem conexão MQTT. Verifique a internet.','err')});
+  client.on('error',err=>{console.error('MQTT:',err);status(role==='idoso'?'elderStatus':'careStatus','Erro MQTT. Confira a internet ou tente novamente.','err')});
+  client.on('message',(t,payload)=>{
+    let data;try{data=JSON.parse(payload.toString())}catch{return}
+    if(t===topic('profile')&&data.name){$('careHello').textContent='Cuidador de '+data.name;return}
+    if(t.startsWith(topic('alerts')+'/')){const id=t.split('/').pop();if(seen.has(id))return;seen.add(id);renderAlert(id,data);notifyAlert(data);return}
+    if(t.startsWith(topic('acks')+'/')){const id=t.split('/').pop();const el=document.querySelector('[data-alert="'+id+'"] .ack-label');if(el)el.textContent='Recebimento confirmado por '+(data.by||'cuidador');}
+  });
+}
+$('start').addEventListener('click',()=>{
+  const role=$('role').value,name=$('name').value.trim(),code=cleanCode($('pair').value);$('pair').value=code;
+  if(!name||code.length<5){status('setupMsg','Informe seu nome e um código com pelo menos 5 caracteres.','err');return}
+  if(typeof mqtt==='undefined'){status('setupMsg','Não foi possível carregar MQTT.js. Verifique a internet e recarregue a página.','err');return}
+  if(client)client.end(true);
+  profile={role,name,code};localStorage.setItem('amparoProfile',JSON.stringify(profile));
+  if(role==='idoso'){show('elder');$('elderHello').textContent='Olá, '+name;$('elderStatus').textContent='Preparando conexão...';connectMQTT(role,name,code)}
+  else{show('care');$('careHello').textContent='Olá, '+name;connectMQTT(role,name,code)}
+});
+function renderAlert(id,a){
+  const empty=$('alerts').querySelector('.notice');if(empty)empty.remove();
+  const card=document.createElement('div');card.className='alert-card';card.dataset.alert=id;
+  const title=document.createElement('h3');title.textContent='Pedido de ajuda';
+  const desc=document.createElement('p');desc.textContent=(a.elderName||'Idoso')+' • '+new Date(a.createdAt||Date.now()).toLocaleString('pt-BR');desc.style.margin='5px 0 12px';
+  const btn=document.createElement('button');btn.className='primary';btn.textContent='Confirmar recebimento';
+  const label=document.createElement('p');label.className='notice ack-label';label.textContent='Aguardando confirmação';
+  btn.onclick=()=>{if(!client||!connected){alert('Sem conexão. Não foi possível confirmar.');return}client.publish(topic('acks/'+id),JSON.stringify({by:$('name').value.trim(),at:Date.now()}),{retain:true,qos:0},err=>{if(err)alert('Falha ao enviar confirmação.');else{btn.textContent='Alerta confirmado';btn.disabled=true;label.textContent='Confirmação enviada'}})};
+  card.append(title,desc,btn,label);$('alerts').prepend(card);
+}
+function notifyAlert(a){if('vibrate'in navigator)navigator.vibrate([350,150,350,150,700]);if('Notification'in window&&Notification.permission==='granted'){try{const n=new Notification('Amparo: pedido de ajuda',{body:(a.elderName||'O idoso')+' pediu ajuda. Abra o painel para confirmar.',tag:'amparo-alert'});n.onclick=()=>{window.focus();n.close()}}catch(e){console.warn(e)}}}
+$('sos').addEventListener('click',()=>{
+  if(!client||!connected){status('elderStatus','Sem conexão. O alerta NÃO foi enviado; tente novamente.','err');return}
+  const btn=$('sos');btn.disabled=true;btn.style.opacity='.7';status('elderStatus','Enviando pedido de ajuda...');
+  const id=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+  const payload={elderName:$('name').value.trim(),createdAt:Date.now(),status:'novo'};
+  client.publish(topic('alerts/'+id),JSON.stringify(payload),{retain:true,qos:0},err=>{
+    if(err)status('elderStatus','Falha ao enviar. Verifique a internet e tente novamente.','err');
+    else{status('elderStatus','Pedido enviado ao serviço MQTT. Aguarde o cuidador confirmar.','ok');if('vibrate'in navigator)navigator.vibrate([150,80,150])}
+    btn.disabled=false;btn.style.opacity='1';
+  });
+});
+$('notify').onclick=async()=>{if(!('Notification'in window)){status('careStatus','Este navegador não oferece notificações.','err');return}try{const p=await Notification.requestPermission();status('careStatus',p==='granted'?'Notificações permitidas enquanto o navegador oferecer suporte.':'Permissão de notificação não concedida.',p==='granted'?'ok':'err')}catch(e){status('careStatus','Não foi possível solicitar permissão.','err')}};
+$('vibrate').onclick=()=>{if('vibrate'in navigator){navigator.vibrate([250,120,250]);status('careStatus','Comando de vibração enviado ao aparelho.','ok')}else status('careStatus','Vibração não suportada neste navegador/aparelho.','err')};
+$('wake').onclick=async()=>{if(!('wakeLock'in navigator)){status('elderStatus','Este navegador não oferece bloqueio de suspensão. Ajuste o tempo de tela nas configurações do celular.','err');return}try{wakeLock=await navigator.wakeLock.request('screen');status('elderStatus','Solicitação ativa para manter a tela ligada.','ok');wakeLock.addEventListener('release',()=>{wakeLock=null})}catch(e){status('elderStatus','O sistema não permitiu manter a tela ligada.','err')}};
+$('clear').onclick=()=>{$('alerts').innerHTML='<p class="notice">Lista limpa nesta tela. Alertas retidos podem reaparecer ao reconectar.</p>'};$('changeProfile').onclick=stop;$('changeProfile2').onclick=stop;
+try{const p=JSON.parse(localStorage.getItem('amparoProfile')||'null');if(p){$('role').value=p.role;$('name').value=p.name;$('pair').value=p.code}}catch(e){}
+</script></body></html>
